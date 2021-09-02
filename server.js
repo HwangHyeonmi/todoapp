@@ -79,13 +79,31 @@ app.get('/list',function(요청,응답){
 
 app.get('/search',(요청,응답)=>{
   console.log(요청.query.value)
-  
-  db.collection('post').find({title:/요청.query.value/}).toArray((에러,결과)=>{
+  var 검색조건 = [
+    {
+      $search: {
+        index: 'titleSearch',
+        text: {
+          query: 요청.query.value,
+          path: ['title','date']  // 제목날짜 둘다 찾고 싶으면 ['제목', '날짜']
+        }
+      }
+    },
+    { $sort : { _id : 1 }},
+    { $limit : 10 }, //제한 걸 수 있음 10개까지만!
+    //어떤 정보를 숨길지 결정!
+    { $project: { title: 1, _id: 0, score: { $meta: "searchScore" } }}
+] 
+  db.collection('post').aggregate(검색조건).toArray((에러,결과)=>{
     console.log(결과)
-    응답.render('search.ejs',{posts:결과})
+    응답.render('search.ejs',{ posts:결과 })
 
     //정확히 일치하는 것만 찾아줌.
     //정규식을 써서 해결하기
+
+    //띄어쓰기 기준으로 정렬하기 때문에 몽고DB로는 한국어 단어 포함된 문장 검색이 어려움
+    //해결책 ->> text index 쓰지 말고 검색할 문서의 양을 제한하기 
+    //해결책2 ->>
 
   });
 });
