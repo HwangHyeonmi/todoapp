@@ -30,29 +30,7 @@ MongoClient.connect(url, { useUnifiedTopology: true }, function(에러,client){
 })
 
 
-app.post('/add', function(요청, 응답){
-  응답.send('전송완료')
-  db.collection('counter').findOne({name: '게시물갯수'}, function(에러, 결과){
-    console.log(결과.totalPost)
-    var 총게시물갯수 = 결과.totalPost;
 
-    db.collection('post').insertOne({_id:총게시물갯수+1,title:요청.body.title,date:요청.body.date},function(에러, 결과){
-      console.log('저장완료');
-
-       //totalPost라는 항목도 1증가시켜야 함.
-       //데이터 수정할 때 operator를 써야 함. 중괄호 안에 중괄호! $set <<같은 것이 operator!!!
-       // $set은 바꿔주는 거, $inc는 증가시키는 거, 
-      db.collection('counter').updateOne({name:'게시물갯수'},{$inc:{totalPost:1}},function(에러,결과){
-      console.log('수정완료')
-    })
-    });
-
-
-   
-  });
-
-  
-});
 
 
 app.get('/', function(요청, 응답) { 
@@ -111,15 +89,7 @@ app.get('/search',(요청,응답)=>{
 
 
 
-app.delete('/delete',function(요청,응답){
-  console.log(요청.body)
-  요청.body._id = parseInt(요청.body._id)
-  //요청.body에 담겨온 게시물 번호를 가진 글을 db에서 찾아서 삭제해 주세요.
-  db.collection('post').deleteOne(요청.body,function(에러,결과){
-    console.log('삭제완료');
-    응답.status(200).send({message:'성공했습니다'});
-  })
-})
+
 
 
 //   /detail로 접속하면 detail.ejs로 보여줌
@@ -186,8 +156,10 @@ app.get('/mypage',로그인했니, function(요청,응답){
 
 function 로그인했니(요청, 응답, next){
   //로그인 후 세션이 있으면 요청.user가 항상 있음.
+  console.log(next)
   if(요청.user){
     next()
+    console.log(next)
   }else{
     응답.send('로그인 안하셨는데요?')
   }
@@ -234,4 +206,67 @@ passport.deserializeUser(function(아이디,done){
   
 })
 
+
+
+
+
+//회원기능이 필요하면 passport 셋팅하는 부분이 위에 있어야 함.
+
+app.post('/register',function(요청,응답){
+  //id가 이미 있는지 확인, id에 알파벳 숫자만 들어있나, 비번 저장 전에 암호화
+  db.collection('login').insertOne({ id: 요청.body.id, pw: 요청.body.pw },function(에러,결과){
+    응답.redirect('/');
+  })
+})
+
+
+app.post('/add', function(요청, 응답){
+  
+  응답.send('전송완료')
+  db.collection('counter').findOne({name: '게시물갯수'}, function(에러, 결과){
+    console.log(결과.totalPost)
+    var 총게시물갯수 = 결과.totalPost;
+
+
+    var 저장할거 = {_id:총게시물갯수+1,작성자 : 요청.user._id ,title:요청.body.title,date:요청.body.date}
+    //데이터 저장할 때 작성자도 추가하자.
+
+    db.collection('post').insertOne(저장할거,function(에러, 결과){
+      console.log('저장완료');
+
+       //totalPost라는 항목도 1증가시켜야 함.
+       //데이터 수정할 때 operator를 써야 함. 중괄호 안에 중괄호! $set <<같은 것이 operator!!!
+       // $set은 바꿔주는 거, $inc는 증가시키는 거, 
+      db.collection('counter').updateOne({name:'게시물갯수'},{$inc:{totalPost:1}},function(에러,결과){
+      console.log('수정완료')
+    })
+    });
+
+
+   
+  });
+
+  
+});
+
+
+
+app.delete('/delete',function(요청,응답){
+  console.log(요청.body)
+  요청.body._id = parseInt(요청.body._id)
+
+  var 삭제할데이터 = { _id : 요청.body._id, 작성자 : 요청.user._id }
+
+  //요청.body에 담겨온 게시물 번호를 가진 글을 db에서 찾아서 삭제해 주세요.
+  db.collection('post').deleteOne(삭제할데이터,function(에러,결과){
+    console.log('삭제완료');
+    if(에러){console.log(에러)}
+    응답.status(200).send({message:'성공했습니다'});
+  })
+})
+
+//로그인한 사람만 접속하게! (미들웨어 역할)
+app.use('/shop', 로그인했니, require('./routes/shop'));
+app.use('/board/sub', 로그인했니, require('./routes/sports'));
+//고객이 / 경로로 요청했을 때 이런 미들웨어를 적용해주세요! router를 적용해주세요.
 
