@@ -1,5 +1,15 @@
 const express = require('express')
 const app = express()
+
+const http = require('http').createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(http);
+
+
+
+
+
+
 app.use(express.urlencoded({extended: true}))
 const MongoClient = require('mongodb').MongoClient;
 const methodOverride = require('method-override')
@@ -19,12 +29,13 @@ var date;
 
 MongoClient.connect(url, { useUnifiedTopology: true }, function(에러,client){
   if(에러) return console.log(에러)
+  db = client.db('todoapp');  //todoapp이라는 database(폴더)에 연결!
 
-  app.listen(process.env.PORT, function() {
+  http.listen(process.env.PORT, function() {
     console.log('listening on 8080')
   })
 
-  db = client.db('todoapp');  //todoapp이라는 database(폴더)에 연결!
+  
   
 
 })
@@ -42,6 +53,69 @@ app.get('/write', function(요청, 응답) {
   응답.render('write.ejs')
     
 });
+
+
+app.get('/chat',function(요청, 응답){
+  응답.render('chat.ejs')
+})
+
+//socket
+io.on('connection', function(socket){
+  //어떤 인간이 웹소켓 연결했을 때 실행해주세요.
+  console.log('연결되었어요!');
+
+  //수신코드 작성하기
+  
+  socket.on('인삿말', function(data){
+    console.log(data)
+    //고객이 보낸 데이타도 출력할 수 있다!
+    //문자를 보내면 페이지에 접속하는 모든 사람들한테
+            //데이터를 보내줘야 함.
+    io.emit('퍼트리기', data);
+  })
+
+});
+
+//네임스페이스 만들기 
+// /채팅방 << namespace 
+// namepsace에 접속한 사람들끼리만 대화 가능
+// 단점 -> 누구나 참여할 수 있다.
+// 서버가 제약을 걸 수 없다??
+
+
+var chat1 = io.of('/채팅방1')
+chat1.on('connection', function(socket){
+
+
+  var 방번호 = '';
+
+  socket.on('방들어가고픔',function(data){
+    //비밀번호 맞으면 조인시켜주세요~~
+
+    //data에 적어주면 된다! obj 들어갈 수 있음ㅇㅇ
+
+    socket.join(data);
+    방번호 = data;
+  })
+
+
+
+
+  socket.on('인삿말', function(data){
+    console.log(data)
+
+    //아래 코드는 동작 안 함.
+   /*  io.emit('퍼트리기', data); */
+    chat1.to(방번호).emit('퍼트리기',data);
+
+    // to =>정확히 어디로 보낼지 설정
+  })
+});
+
+
+
+
+
 
 app.get('/list',function(요청,응답){
   //디비에 저장된 post라는 collection 안의 '특정' 데이터를 꺼내주세요.
@@ -85,6 +159,8 @@ app.get('/search',(요청,응답)=>{
 
   });
 });
+
+
 
 
 
@@ -269,4 +345,49 @@ app.delete('/delete',function(요청,응답){
 app.use('/shop', 로그인했니, require('./routes/shop'));
 app.use('/board/sub', 로그인했니, require('./routes/sports'));
 //고객이 / 경로로 요청했을 때 이런 미들웨어를 적용해주세요! router를 적용해주세요.
+
+
+// multer -> 파일 전송한 거 쉽게 저장시키고 분석하도록 도와주는 라이브러리
+
+//multer 불러오기
+let multer = require('multer');
+//diskStorage 그냥 일반 하드에 저장해주세요.
+//memoryStorage 메모리에 저장해주세요(휘발성)
+var storage = multer.diskStorage({
+  destination : function(req, file, cb){
+    cb(null, './public/image')
+    //이미지 저장경로 지정!
+  },
+  filename : function(req, file, cb){
+    cb(null, file.originalname)
+    //파일명 지정 가능 
+  },
+  
+});
+
+var upload = multer({storage : storage});
+
+//이미지 업로드 시 multer 동작시키기
+
+
+
+app.get('/upload',function(요청, 응답){
+  응답.render('upload.ejs')
+});
+
+
+app.post('/upload', upload.single('프로필'), function(요청,응답){
+  응답.send('업로드 완료')
+});
+
+app.get('/image/:imageName',function(요청,응답){
+  응답.sendFile(__dirname+'/public/image/'+ 요청.params.imageName)
+})
+
+
+
+//채팅은 get/post 이런걸로 하지 않음. 무거움
+//간단한 문자만 주고 받고 싶을 때는 web socket 이용함!
+//최신 브라우저에서만 이용할 수 있다. 
+//호환성 생각하면 socket.ion를 쓴다!
 
